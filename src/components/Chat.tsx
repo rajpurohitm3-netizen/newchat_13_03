@@ -609,7 +609,31 @@ export function Chat({ session, privateKey, initialContact, isPartnerOnline, onB
     });
   };
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+    useEffect(() => {
+      const hasMismatch = messages.some(m => m.decrypted_content === "__SIGNAL_MISMATCH__");
+      if (hasMismatch) {
+        const lastSync = sessionStorage.getItem(`last_sync_${session.user.id}`);
+        const now = Date.now();
+        
+        // Auto-sync public key if we haven't in the last 5 minutes
+        if (!lastSync || now - parseInt(lastSync) > 300000) {
+          const storedPubKey = localStorage.getItem(`pub_key_${session.user.id}`);
+          if (storedPubKey) {
+            supabase.from("profiles").update({ 
+              public_key: storedPubKey,
+              updated_at: new Date().toISOString()
+            }).eq("id", session.user.id).then(() => {
+              sessionStorage.setItem(`last_sync_${session.user.id}`, now.toString());
+              console.log("Proactive identity sync completed");
+            });
+          }
+        }
+      }
+    }, [messages, session.user.id]);
+
+    useEffect(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
   async function sendMessage(mediaType: string = "text", mediaUrl: string | null = null) {
     if (!newMessage.trim() && !mediaUrl) return;
@@ -878,27 +902,34 @@ export function Chat({ session, privateKey, initialContact, isPartnerOnline, onB
                         <span className="text-[10px] font-bold uppercase tracking-widest text-white">Live Location Packet</span>
                       </a>
                     ) : (
-                        <div className={`p-5 px-6 rounded-[2.2rem] text-[13px] font-medium leading-relaxed shadow-2xl relative transition-all hover:translate-y-[-1px] ${
-                          isMe 
-                            ? "bg-gradient-to-br from-indigo-600 to-indigo-700 text-white border border-indigo-500/30 rounded-tr-none" 
-                            : "bg-white/[0.04] backdrop-blur-xl border border-white/10 text-white/90 rounded-tl-none"
-                        }`}>
-                          {msg.decrypted_content === "__SIGNAL_MISMATCH__" ? (
-                            <div className="flex flex-col gap-2">
-                              <span className="text-red-400 font-bold flex items-center gap-2">
-                                <Shield className="w-4 h-4" /> Signal Mismatch
-                              </span>
-                              <span className="text-[10px] text-white/40 leading-tight">Identity mismatch across devices. Sync required.</span>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); repairIdentity(); }}
-                                className="mt-1 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-500/30 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400 transition-all active:scale-95"
-                              >
-                                Auto-Repair Signal
-                              </button>
-                            </div>
-                          ) : (
-                            msg.decrypted_content || "🔒 Signal Encrypted"
-                          )}
+                          <div className={`p-5 px-6 rounded-[2.2rem] text-[14px] font-medium leading-relaxed shadow-2xl relative transition-all hover:translate-y-[-1px] ${
+                            isMe 
+                              ? "bg-gradient-to-br from-indigo-600 to-indigo-700 text-white border border-indigo-500/30 rounded-tr-none shadow-indigo-500/10" 
+                              : "bg-white/[0.08] backdrop-blur-2xl border border-white/15 text-white rounded-tl-none shadow-black/40"
+                          }`}>
+                            {msg.decrypted_content === "__SIGNAL_MISMATCH__" ? (
+                              <div className="flex flex-col gap-3 py-1">
+                                <div className="flex items-center gap-2 text-orange-400">
+                                  <Shield className="w-4 h-4 animate-pulse" />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Signal Sync Required</span>
+                                </div>
+                                <p className="text-[10px] text-white/50 leading-relaxed font-bold uppercase tracking-tighter">Identity mismatch detected between your devices. Re-syncing security protocols is required to read this packet.</p>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); repairIdentity(); }}
+                                  className="w-full mt-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-white shadow-lg shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                  Repair Identity
+                                </button>
+                              </div>
+                            ) : (
+                              msg.decrypted_content || (
+                                <div className="flex items-center gap-2 opacity-40 italic">
+                                  <Lock className="w-3.5 h-3.5" />
+                                  <span>Decrypting signal...</span>
+                                </div>
+                              )
+                            )}
                         {isViewOnce && (
                           <div className="absolute -top-3 -right-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-full p-1.5 shadow-lg border border-black/20">
                             <Eye className="w-3 h-3 text-white" />
@@ -968,10 +999,10 @@ export function Chat({ session, privateKey, initialContact, isPartnerOnline, onB
               exit={{ opacity: 0, y: 10 }}
               className="flex justify-start"
             >
-              <div className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[1.5rem] rounded-tl-none p-4 flex items-center gap-1.5">
-                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+              <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/15 rounded-[1.5rem] rounded-tl-none p-4 flex items-center gap-2 shadow-lg">
+                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                <motion.div animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
               </div>
             </motion.div>
           )}
