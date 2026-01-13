@@ -148,6 +148,15 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session?.user && isApproved === false) {
+      toast.info("Access Pending", {
+        description: "Your account is currently awaiting admin verification.",
+        duration: 5000,
+      });
+    }
+  }, [session, isApproved]);
+
   async function checkApprovalAndOTP(userId: string) {
     try {
       const { data, error } = await supabase

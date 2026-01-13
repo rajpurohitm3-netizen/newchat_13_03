@@ -116,8 +116,12 @@ export function Auth() {
               console.error("Failed to notify admins:", notifyError);
             }
 
-            await confirmUserEmail(data.user.id);
-            setShowPendingMessage(true);
+              await confirmUserEmail(data.user.id);
+              toast.success("Request submitted successfully! Please wait for admin approval.", {
+                description: "Your node activation is pending manual verification.",
+                duration: 5000,
+              });
+              setShowPendingMessage(true);
           }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
