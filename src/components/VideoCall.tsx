@@ -43,38 +43,36 @@ export function VideoCall({
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const myVideo = useRef<HTMLVideoElement>(null);
-  const userVideo = useRef<HTMLVideoElement>(null);
-  const remoteAudio = useRef<HTMLAudioElement>(null);
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const channelRef = useRef<any>(null);
-  const hasAnswered = useRef(false);
-  const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
-  const remoteDescriptionSet = useRef(false);
-  const partnerPublicKeyRef = useRef<CryptoKey | null>(null);
-  const isReadyToReceive = useRef(false);
+    const myVideo = useRef<HTMLVideoElement>(null);
+    const userVideo = useRef<HTMLVideoElement>(null);
+    const peerConnection = useRef<RTCPeerConnection | null>(null);
+    const channelRef = useRef<any>(null);
+    const hasAnswered = useRef(false);
+    const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
+    const remoteDescriptionSet = useRef(false);
+    const partnerPublicKeyRef = useRef<CryptoKey | null>(null);
+    const isReadyToReceive = useRef(false);
+    const [audioBlocked, setAudioBlocked] = useState(false);
 
-  useEffect(() => {
-    if (myVideo.current && stream) {
-      myVideo.current.srcObject = stream;
-      myVideo.current.play().catch(e => console.error("My video play failed:", e));
-    }
-  }, [stream]);
+    useEffect(() => {
+      if (myVideo.current && stream) {
+        myVideo.current.srcObject = stream;
+        myVideo.current.play().catch(e => console.error("My video play failed:", e));
+      }
+    }, [stream]);
 
-  useEffect(() => {
-    if (userVideo.current && remoteStream) {
-      userVideo.current.srcObject = remoteStream;
-      userVideo.current.onloadedmetadata = () => {
-        userVideo.current?.play().catch(e => console.error("Remote video play failed:", e));
-      };
-    }
-    if (remoteAudio.current && remoteStream) {
-      remoteAudio.current.srcObject = remoteStream;
-      remoteAudio.current.onloadedmetadata = () => {
-        remoteAudio.current?.play().catch(e => console.error("Remote audio play failed:", e));
-      };
-    }
-  }, [remoteStream]);
+    useEffect(() => {
+      if (userVideo.current && remoteStream) {
+        userVideo.current.srcObject = remoteStream;
+        userVideo.current.onloadedmetadata = () => {
+          userVideo.current?.play().catch(e => {
+            console.error("Remote video play failed, might be blocked:", e);
+            setAudioBlocked(true);
+          });
+        };
+      }
+    }, [remoteStream]);
+
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -348,7 +346,6 @@ export function VideoCall({
 
   const toggleSpeaker = () => {
     if (userVideo.current) userVideo.current.muted = !userVideo.current.muted;
-    if (remoteAudio.current) remoteAudio.current.muted = !remoteAudio.current.muted;
     setIsSpeakerOn(!isSpeakerOn);
   };
 
@@ -384,7 +381,6 @@ export function VideoCall({
 
   return (
     <div className={`fixed inset-0 z-[100] ${isMinimized ? 'pointer-events-none' : 'bg-black'}`}>
-      <audio ref={remoteAudio} autoPlay playsInline />
       <motion.div 
         ref={containerRef}
         layout
@@ -403,6 +399,20 @@ export function VideoCall({
         className={`bg-zinc-950 overflow-hidden relative shadow-2xl pointer-events-auto ${isMinimized ? 'cursor-move border border-white/20' : ''}`}
       >
         <video ref={userVideo} autoPlay playsInline className={`w-full h-full object-cover ${(!remoteStream || !hasRemoteVideo) ? 'hidden' : 'block'}`} />
+        
+        {audioBlocked && !isMinimized && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <Button 
+              onClick={() => {
+                userVideo.current?.play();
+                setAudioBlocked(false);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 px-8 py-6 rounded-2xl font-black uppercase tracking-widest text-xs animate-bounce"
+            >
+              Tap to Enable Audio & Video
+            </Button>
+          </div>
+        )}
         {(!remoteStream || !hasRemoteVideo) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950">
             <div className="relative">

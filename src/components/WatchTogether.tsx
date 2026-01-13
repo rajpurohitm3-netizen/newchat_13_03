@@ -68,6 +68,7 @@ export function WatchTogether({ userId, friendId, friendProfile, myProfile, onCl
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const [loading, setLoading] = useState(false);
     const [view, setView] = useState<"menu" | "room">("menu");
     const [needsLocalFile, setNeedsLocalFile] = useState(false);
@@ -199,12 +200,19 @@ export function WatchTogether({ userId, friendId, friendProfile, myProfile, onCl
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
     }
   }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.onloadedmetadata = () => {
+        remoteVideoRef.current?.play().catch(e => {
+          console.error("Remote video call play failed:", e);
+          setAudioBlocked(true);
+        });
+      };
     }
   }, [remoteStream]);
 
@@ -1516,17 +1524,33 @@ export function WatchTogether({ userId, friendId, friendProfile, myProfile, onCl
                   </Button>
                 </div>
 
-                <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto custom-scrollbar">
-                  {/* Remote Video (Face to Face) */}
-                  <div className="relative aspect-[3/4] bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 group">
-                    {remoteStream ? (
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
+                  <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto custom-scrollbar">
+                    {/* Remote Video (Face to Face) */}
+                    <div className="relative aspect-[3/4] bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 group">
+                      {remoteStream ? (
+                        <>
+                          <video
+                            ref={remoteVideoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                          {audioBlocked && (
+                            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-center">
+                              <Button 
+                                onClick={() => {
+                                  remoteVideoRef.current?.play();
+                                  setAudioBlocked(false);
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-[8px]"
+                              >
+                                Enable Audio
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+
                       <div className="w-full h-full flex flex-col items-center justify-center gap-4">
                         <div className="relative">
                           <div className="absolute inset-0 bg-indigo-500/20 blur-2xl animate-pulse rounded-full" />
